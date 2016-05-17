@@ -26,10 +26,7 @@ const int kSDCardDetect = 7;
 
 #define FILE_FLUSH_MS 2000     
 
-const int SDCARD_CS = SS; //SS;
 
-//Adafruit_BMP280 bme0; // I2C
-//Adafruit_BMP280 bme0(BMP_CS0); // hardware SPI
 OpenBMP280 bme0(BMP_CS0, BMP_MOSI, BMP_MISO,  BMP_SCK);
 OpenBMP280 bme1(BMP_CS1, BMP_MOSI, BMP_MISO,  BMP_SCK);
 OpenBMP280 bme2(BMP_CS2, BMP_MOSI, BMP_MISO,  BMP_SCK);
