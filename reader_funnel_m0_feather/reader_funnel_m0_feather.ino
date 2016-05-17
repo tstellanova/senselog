@@ -4,7 +4,6 @@
  */
 
 #include <OpenBMP280.h>
-#include <SPI.h>
 #include <SD.h>
 
 // base SPI pins
