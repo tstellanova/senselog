@@ -1,5 +1,6 @@
 /*
-Analog data logger for the Hobbytronics ArduLog _rtc board.
+Analog data logger for the Hobbytronics ArduLog_RTC board.
+Build for the "Arduino/Genuino UNO" board.
 */
 
 #include <SPI.h>
@@ -7,15 +8,15 @@ Analog data logger for the Hobbytronics ArduLog _rtc board.
 #include <Wire.h>
 #include <RTClib.h>
 
-#define SENSOR_COUNT     4 // number of analog pins to log
 
-RTC_DS1307 _rtc; // access to the Real Time Clock
 
 const int kStatusLED = 5; // Green Status LED on pin 5
 const int kSDCardDetectPin = 6; // the micro SD card detect pin
+const int kSensorCount = 4; // number of analog pins to log
 
-uint16_t _raw_sensor_data[SENSOR_COUNT] = {};
-File logFile;
+RTC_DS1307 _rtc; // access to the Real Time Clock
+uint16_t _raw_sensor_data[kSensorCount] = {};
+File _file;
 
 // Struct to hold config info from config.txt file
 struct {
@@ -77,14 +78,14 @@ void setup()
     }
     
     // write header
-    logFile.print("time");
+    _file.print("time");
 
-    for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
-      logFile.print("\tsens");
-      logFile.print(i, DEC);    
+    for (uint8_t i = 0; i < kSensorCount; i++) {
+      _file.print("\tsens");
+      _file.print(i, DEC);    
     }
     
-    logFile.println("");
+    _file.println("");
   
   }
   else  {
@@ -146,13 +147,13 @@ void loop()
 
     // read sensor data 
     uint32_t sumData = 0;
-    for (uint8_t ia = 0; ia < SENSOR_COUNT; ia++) {
+    for (uint8_t ia = 0; ia < kSensorCount; ia++) {
       _raw_sensor_data[ia] = analogRead(ia);
       sumData += _raw_sensor_data[ia];
     }
     
     if (0 == sumData) {
-      //don't log all-zeroes sensor data to logFile
+      //don't log all-zeroes sensor data to _file
       Serial.println("...");
       return;
     }
@@ -162,15 +163,15 @@ void loop()
    
     if(!digitalRead(kSDCardDetectPin))  {
       // Print date/time to file
-      logFile.print(rtc_datetime);
-      for (uint8_t ia = 0; ia < SENSOR_COUNT; ia++) {
-        logFile.print('\t');   
-        logFile.print(_raw_sensor_data[ia]);
+      _file.print(rtc_datetime);
+      for (uint8_t ia = 0; ia < kSensorCount; ia++) {
+        _file.print('\t');   
+        _file.print(_raw_sensor_data[ia]);
       }
-      logFile.println("");
+      _file.println("");
 
       // Flush to logFile
-      logFile.flush();
+      _file.flush();
     }  
 
    }  
@@ -182,10 +183,10 @@ bool openLogFile() {
     Serial.print("Opening log file: ");
     Serial.println(config.filename);
     
-    logFile = SD.open(config.filename, FILE_WRITE);
+    _file = SD.open(config.filename, FILE_WRITE);
 
     // if the file opened okay, output the name
-    if (logFile) {
+    if (_file) {
       return true;
     }  
     else {
