@@ -1,14 +1,17 @@
+/**
+ * 
+ * 
+ */
+
 #include <OpenBMP280.h>
+` #include <SD.h>
 
-
-#include <SPI.h>
-#include <SD.h>
-
-
+// base SPI pins
 #define BMP_MOSI 13
 #define BMP_MISO 12
 #define BMP_SCK 11
 
+// SPI chip select pins
 #define BMP_CS0 20
 #define BMP_CS1 21
 #define BMP_CS2 5
@@ -17,31 +20,31 @@
 #define BMP_CS5 10
 
 const int kErrorLED = 13;
+
+// SD card constants
 const int kSDChipSelect = 4;
 const int kSDStatusLED = 8;
 const int kSDCardDetect = 7;
+const int kSDFileFlush_ms = 2000;
 
+// main user serial output port
 #define USERIAL Serial1
+
+// debug serial output port
 #define DSERIAL Serial
 
 #define FIELD_SEPARATOR "\t"
 
-#define FILE_FLUSH_MS 2000     
+// time at which we start this app
+unsigned long _startTime; 
 
-const int SDCARD_CS = SS; //SS;
+// sensors
+const int kNumSensors = 6;
+const int _select_pins[kNumSensors] = { BMP_CS0, BMP_CS1, BMP_CS2, BMP_CS3, BMP_CS4, BMP_CS5 };
+OpenBMP280* _sensor[kNumSensors];
 
-//Adafruit_BMP280 bme0; // I2C
-//Adafruit_BMP280 bme0(BMP_CS0); // hardware SPI
-//OpenBMP280 bmeA(BMP_CS0, BMP_MOSI, BMP_MISO,  BMP_SCK);
-OpenBMP280 bme0(BMP_CS0, BMP_MOSI, BMP_MISO,  BMP_SCK);
-OpenBMP280 bme1(BMP_CS1, BMP_MOSI, BMP_MISO,  BMP_SCK);
-OpenBMP280 bme2(BMP_CS2, BMP_MOSI, BMP_MISO,  BMP_SCK);
-OpenBMP280 bme3(BMP_CS3, BMP_MOSI, BMP_MISO,  BMP_SCK);
-OpenBMP280 bme4(BMP_CS4, BMP_MOSI, BMP_MISO,  BMP_SCK);
-OpenBMP280 bme5(BMP_CS5, BMP_MOSI, BMP_MISO,  BMP_SCK);
-
+// logging
 File _logFile;
-
 unsigned long _lastFlushTime;
 
 void flashErrorLED() {
@@ -58,6 +61,7 @@ void flashErrorLED() {
       digitalWrite(kErrorLED, LOW);
       delay(750);
 }
+
 void failError(String msg) {
     DSERIAL.println(msg);
     DSERIAL.println(msg);
@@ -69,7 +73,7 @@ void failError(String msg) {
 }
 
 void openSDLog() {
-  
+  //determine whether SD card is present
   if(digitalRead(kSDCardDetect)) {
     if (!SD.begin(kSDChipSelect)){
         failError(F("Couldn't SD.begin"));
@@ -84,32 +88,27 @@ void openSDLog() {
       failError(F("No SD card detected"));
   }
   
+  _lastFlushTime = _startTime;
 }
 
 void setupPinMap() {
-  pinMode(kSDCardDetect, INPUT);  // SD card detect
+  //config SD pins
+  pinMode(kSDCardDetect, INPUT);  // SD card presence detector
   pinMode(kSDStatusLED, OUTPUT);  // Status LED
-  
+
+  //config base SPI pins
   pinMode(BMP_SCK, OUTPUT);
   pinMode(BMP_MOSI, OUTPUT);
   pinMode(BMP_MISO, INPUT);
-  
-  pinMode(BMP_CS0, OUTPUT);
-  digitalWrite(BMP_CS0, HIGH);
-  pinMode(BMP_CS1, OUTPUT);
-  digitalWrite(BMP_CS1, HIGH);
-  pinMode(BMP_CS2, OUTPUT);
-  digitalWrite(BMP_CS2, HIGH);
-  pinMode(BMP_CS3, OUTPUT);
-  digitalWrite(BMP_CS3, HIGH);
-  pinMode(BMP_CS4, OUTPUT);
-  digitalWrite(BMP_CS4, HIGH);
-  pinMode(BMP_CS5, OUTPUT);
-  digitalWrite(BMP_CS5, HIGH);
-  
+
+  //setup all the SPI sensor select pins
+  for (int i = 0; i  < kNumSensors ; i++) {
+    pinMode(_select_pins[i], OUTPUT);
+    digitalWrite(_select_pins[i], HIGH);
+  }
 }
 
-
+// Start a single BMP sensor
 bool startOneSensor(OpenBMP280& sensor) {
   int startupCount = 0;
   bool started = false;
@@ -123,15 +122,14 @@ bool startOneSensor(OpenBMP280& sensor) {
   return started;
 }
 
-
-void setup() {
+void setupSerialPorts() {
   DSERIAL.begin(9600);
   for (int i = 0; i < 10; i++) {
     if (!DSERIAL) {
-      digitalWrite(kSDStatusLED, HIGH);  // started 
+      digitalWrite(kErrorLED, HIGH); 
       // wait for serial port to connect. Needed for native USB port only
       delay(100);
-      digitalWrite(kSDStatusLED, LOW);  //  done 
+      digitalWrite(kErrorLED, LOW);
     }
   }
   if (DSERIAL) {
@@ -141,87 +139,77 @@ void setup() {
   USERIAL.begin(9600);
   for (int i = 0; i < 10; i++) {
     if (!USERIAL) {
-      digitalWrite(kSDStatusLED, HIGH);  // started 
+      digitalWrite(kErrorLED, HIGH); 
       // wait for serial port to connect.
       delay(100);
-      digitalWrite(kSDStatusLED, LOW);  //  done 
+      digitalWrite(kErrorLED, LOW);
     }
   }
   if (USERIAL) {
     USERIAL.println("hello USERIAL");
   }
-  
-  setupPinMap();
-
-  _lastFlushTime = millis();
-
-//  if (!startOneSensor(bme0)) {  
-//    failError(F("bme0 not responding"));
-//  }
-//  if (!startOneSensor(bme1)) {  
-//    failError(F("bme1 not responding"));
-//  }
-//  if (!startOneSensor(bme2)) {  
-//    failError(F("bme2 not responding"));
-//  }
-//  if (!startOneSensor(bme3)) {  
-//    failError(F("bme3 not responding"));
-//  }
-//  if (!startOneSensor(bme4)) {  
-//    failError(F("bme4 not responding"));
-//  }
-//  if (!startOneSensor(bme5)) {  
-//    failError(F("bme5 not responding"));
-//  }
-
-  openSDLog();
-
 }
 
-void loop() {
-  float p0, p1, p2, p3, p4, p5, dp0, dp1, dp2;
+void setup() {
+  _startTime = millis();
 
-  digitalWrite(kSDStatusLED, HIGH);  // started 
+  setupSerialPorts();
+  setupPinMap();
+
+  for (int i = 0; i  < kNumSensors ; i++) {
+    const int select = _select_pins[i];
+    _sensor[i] = new OpenBMP280(select, BMP_MOSI, BMP_MISO, BMP_SCK);
+    if (!startOneSensor(*_sensor[i])) {  
+      char errBuf[40];
+      sprintf(errBuf, "Sensor %d is not responding",i);
+      failError(errBuf);
+    }
+
+    pinMode(_select_pins[i], OUTPUT);
+    digitalWrite(_select_pins[i], HIGH);
+  }
+ 
+  openSDLog();
+}
+
+void outputVector(float* points)
+{
+  char outBuf[80];
+
+  long currentTime = millis();
+  long dTime = currentTime - _startTime;
   
-  p0 = bme0.readPressure();
-  p1 = bme1.readPressure();
-//  p2 = bme2.readPressure();
-//  p3 = bme3.readPressure();
-//  p4 = bme4.readPressure();
-//  p5 = bme5.readPressure();
-
-  dp0 = (p1 - p0);
-//  dp1 = (p3 - p2);
-//  dp2 = (p5 - p4);
-
+  sprintf(outBuf,"%8d\t%7.2f\t%7.2f\t%7.2f",dTime,points[0],points[1],points[2]);
   if (DSERIAL) {
-    DSERIAL.print(dp0);
-    Serial.print(FIELD_SEPARATOR);
-    Serial.print(dp1);
-    Serial.print(FIELD_SEPARATOR);
-    Serial.print(dp2);
-    Serial.println(F(""));
+    DSERIAL.println(outBuf);
   }
 
   if (USERIAL) {
-    USERIAL.println(dp0);
-//    USERIAL.println(F(""));
+    USERIAL.println(outBuf);
   }
   
   if (_logFile) {
-    _logFile.print(dp0);
-    _logFile.print(FIELD_SEPARATOR);
-    _logFile.print(dp1);
-    _logFile.print(FIELD_SEPARATOR);
-    _logFile.print(dp2);
-    _logFile.println(F(""));
+    _logFile.println(outBuf);
     
-    long currentTime = millis();
-    if(currentTime >= (_lastFlushTime + FILE_FLUSH_MS)) {
+    if(currentTime >= (_lastFlushTime + kSDFileFlush_ms)) {
        _logFile.flush();
        _lastFlushTime = currentTime;  
     } 
   }
+
+}
+
+void loop() {
+  float points[3] = {};
+  digitalWrite(kSDStatusLED, HIGH);  // started read
+
+  for (int i = 0, j = 0; i  < kNumSensors ; i+=2, j++) {
+    float p0 = _sensor[i]->readPressure();
+    float p1 = _sensor[i+1]->readPressure();
+    points[j] = p0 - p1;
+  }
+  
+  outputVector(points);
 
   digitalWrite(kSDStatusLED, LOW);  //  done 
   
