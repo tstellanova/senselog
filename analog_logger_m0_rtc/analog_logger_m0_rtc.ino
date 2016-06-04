@@ -13,7 +13,7 @@ const int kSDChipSelect = 10;
 const int kStatusLED = 13;
 const int kSDCardDetect = 7;
 
-const int kOversampleTime = 2500; //ms
+const int kOversampleTime = 60000; //ms
 const int kLoopDelayTime = 500; //ms
 const int kNumOversamples = (kOversampleTime/kLoopDelayTime);
 
@@ -84,6 +84,7 @@ void clearSampleBuffer() {
       _senseBucket[i] = 0;
     }
 }
+
 void setupPinMap() {
   pinMode(kSDCardDetect, INPUT);  // SD card detect
   pinMode(kStatusLED, OUTPUT);  // Status LED
@@ -146,7 +147,7 @@ void setup() {
   _startTime = millis();
   _lastFlushTime = millis();
 
-  logMsg("time\tA0\tA1\tA2\tA3");
+  logMsg("             time\tA0\tA1\tA2\tA3\tA4\tA5");
   _numSamplesRead = 0;
 }
 

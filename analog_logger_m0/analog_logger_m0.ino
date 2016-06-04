@@ -27,7 +27,7 @@ File _logFile;
 
 unsigned long _lastFlushTime;
 unsigned long _startTime;
-uint16_t _numSamplesRead;
+uint32_t _numSamplesRead;
 uint32_t _senseBucket[kNumSensors];
 
 void flashErrorLED() {
@@ -69,6 +69,14 @@ void openSDLog() {
  //     failError(F("No SD card detected"));
  // }
   
+}
+
+void clearSampleBuffer() {
+      //clear the sample buffer
+    _numSamplesRead = 0;
+    for (int i = 0 ; i < kNumSensors; i++) {
+      _senseBucket[i] = 0;
+    }
 }
 
 void setupPinMap() {
@@ -115,6 +123,8 @@ void setup() {
   }
 
   setupPinMap();
+  clearSampleBuffer();
+
   openSDLog();
   _startTime = millis();
   _lastFlushTime = millis();
@@ -145,11 +155,7 @@ void loop() {
     _senseBucket[0],_senseBucket[1],_senseBucket[2],_senseBucket[3]);
     logMsg(outBuf);
 
-    //clear the sample buffer
-    _numSamplesRead = 0;
-    for (int i = 0 ; i < kNumSensors; i++) {
-      _senseBucket[i] = 0;
-    }
+    clearSampleBuffer();
     
   }
     
