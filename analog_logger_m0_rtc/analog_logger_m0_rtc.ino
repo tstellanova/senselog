@@ -13,7 +13,7 @@ const int kSDChipSelect = 10;
 const int kStatusLED = 13;
 const int kSDCardDetect = 7;
 
-const int kOversampleTime = 5000; //ms
+const int kOversampleTime = 2500; //ms
 const int kLoopDelayTime = 500; //ms
 const int kNumOversamples = (kOversampleTime/kLoopDelayTime);
 
@@ -33,7 +33,7 @@ char _dateTimeBuf[17];
 
 unsigned long _lastFlushTime;
 unsigned long _startTime;
-uint16_t _numSamplesRead;
+uint32_t _numSamplesRead;
 uint32_t _senseBucket[kNumSensors];
 
 void flashErrorLED() {
