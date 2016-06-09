@@ -13,7 +13,7 @@ const int kSDChipSelect = 10;
 const int kStatusLED = 13;
 const int kSDCardDetect = 7;
 
-const int kOversampleTime = 60000; //ms
+const int kOversampleTime = 2000; //ms
 const int kLoopDelayTime = 500; //ms
 const int kNumOversamples = (kOversampleTime/kLoopDelayTime);
 
@@ -61,20 +61,14 @@ void failError(String msg) {
 
 void openSDLog() {
   
-  // if(digitalRead(kSDCardDetect)) {
-    if (!SD.begin(kSDChipSelect)){
-        failError(F("Couldn't SD.begin"));
-      } 
+  if (!SD.begin(kSDChipSelect)){
+      failError(F("Couldn't SD.begin"));
+  } 
+  _logFile = SD.open("LOGGER.TSV", FILE_WRITE);
+  if (!_logFile) {
+    failError(F("Couldn't open file"));
+  }
 
-    _logFile = SD.open("LOGGER.TSV", FILE_WRITE);
-    if (!_logFile) {
-      failError(F("Couldn't open file"));
-    }
- // }
- // else {
- //     failError(F("No SD card detected"));
- // }
-  
 }
 
 void clearSampleBuffer() {
@@ -92,6 +86,9 @@ void setupPinMap() {
   for (int i = 0; i < kNumSensors; i++) {
     pinMode(_sensePins[i], INPUT);
   }
+
+  //increase ADC resolution to maximum for the M0 
+  analogReadResolution(12);
   
 }
 
@@ -112,6 +109,17 @@ void logMsg(String msg) {
   }
 }
 
+// call back for file timestamps
+void dateTime(uint16_t* date, uint16_t* time) {
+  DateTime now = _rtc.now();
+
+  // return date using FAT_DATE macro to format fields
+  *date = FAT_DATE(now.year(), now.month(), now.day());
+
+  // return time using FAT_TIME macro to format fields
+  *time = FAT_TIME(now.hour(), now.minute(), now.second());
+}
+
 void setup() {
 
   DSERIAL.begin(9600);
@@ -129,6 +137,9 @@ void setup() {
 
   setupPinMap();
 
+  //SdFile uses this callback to mark the log file with correct time/date stamp
+  SdFile::dateTimeCallback(dateTime);
+  
   clearSampleBuffer();
 
   if (! _rtc.begin()) {
@@ -150,6 +161,8 @@ void setup() {
   logMsg("             time\tA0\tA1\tA2\tA3\tA4\tA5");
   _numSamplesRead = 0;
 }
+
+
 
 void loop() {
   char outBuf[80];
