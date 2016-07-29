@@ -1,24 +1,19 @@
 
 
-#include "RTClib.h"
 #include "Adafruit_VEML6070.h"
 #include <SPI.h>
 #include <SD.h>
 
 
 const int kErrorLED = 13;
-const int kSDChipSelect = 10;
-//On the "M0 basic proto" or "Adalogger RTC wing"
-//there is no separate status LED
-const int kStatusLED = 13;
+const int kSDChipSelect = 4;
+const int kStatusLED = 8;
 const int kSDCardDetect = 7;
 
 const int kOversampleTime = 60000; //ms
 const int kLoopDelayTime = 1000; //ms
 const int kNumOversamples = (kOversampleTime/kLoopDelayTime);
-
-const int kNumSensors = 6;
-const int _sensePins[kNumSensors] = {A0, A1, A2, A3, A4, A5};
+const int kMillisToTimestamp = 60000;
 
 #define FIELD_SEPARATOR "\t"
 
@@ -26,8 +21,6 @@ const int _sensePins[kNumSensors] = {A0, A1, A2, A3, A4, A5};
 
 
 File _logFile;
-RTC_PCF8523 _rtc;
-char _dateTimeBuf[17];  
 Adafruit_VEML6070 _vemlUV = Adafruit_VEML6070();
 
 #define DSERIAL   Serial
@@ -35,7 +28,6 @@ Adafruit_VEML6070 _vemlUV = Adafruit_VEML6070();
 unsigned long _lastFlushTime;
 unsigned long _startTime;
 uint32_t _numSamplesRead = 0;
-uint32_t _senseBucket[kNumSensors] = {};
 uint32_t _vemlBucket = 0;
 
 void flashErrorLED() {
@@ -76,23 +68,13 @@ void openSDLog() {
 void clearSampleBuffer() {
       //clear the sample buffer
     _numSamplesRead = 0;
-    for (int i = 0 ; i < kNumSensors; i++) {
-      _senseBucket[i] = 0;
-    }
     _vemlBucket = 0;
 }
 
 void setupPinMap() {
   pinMode(kSDCardDetect, INPUT);  // SD card detect
   pinMode(kStatusLED, OUTPUT);  // Status LED
-
-  for (int i = 0; i < kNumSensors; i++) {
-    pinMode(_sensePins[i], INPUT);
-  }
-
-  //increase ADC resolution to maximum for the M0 
-  analogReadResolution(12);
-  
+  pinMode(kErrorLED, OUTPUT); // Error LED
 }
 
 
@@ -112,16 +94,7 @@ void logMsg(String msg) {
   }
 }
 
-// call back for file timestamps
-void dateTime(uint16_t* date, uint16_t* time) {
-  DateTime now = _rtc.now();
 
-  // return date using FAT_DATE macro to format fields
-  *date = FAT_DATE(now.year(), now.month(), now.day());
-
-  // return time using FAT_TIME macro to format fields
-  *time = FAT_TIME(now.hour(), now.minute(), now.second());
-}
 
 void setup() {
 
@@ -139,31 +112,15 @@ void setup() {
   }
 
   setupPinMap();
-
-  //SdFile uses this callback to mark the log file with correct time/date stamp
-  SdFile::dateTimeCallback(dateTime);
-  
-
-  if (! _rtc.begin()) {
-    failError(F("Couldn't start RTC"));
-  }
-  else if (!_rtc.initialized()) {
-    logMsg("Setting RTC timestamp");
-    // following line sets the RTC to the date & time this sketch was compiled
-    _rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-    // This line sets the RTC with an explicit date & time, for example to set
-    // January 21, 2014 at 3am you would call:
-    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
-  }
+  digitalWrite(kErrorLED, LOW);
 
   _vemlUV.begin(VEML6070_1_T);
-
   
   openSDLog();
   _startTime = millis();
   _lastFlushTime = millis();
 
-  logMsg("             time\tA0\tA1\tA2\tA5\tVEML");
+  logMsg("min\tVEML");
 
   clearSampleBuffer();
 
@@ -178,46 +135,26 @@ void loop() {
 
   val = _vemlUV.readUV();
 
-  if (0 == val) {
-    delay(kLoopDelayTime/2);
-    return;
-  }
+//  if (0 == val) {
+//    clearSampleBuffer();
+//    delay(kLoopDelayTime/2);
+//    return;
+//  }
   
-  _vemlBucket += val;
-  
-  for ( i = 0; i < kNumSensors; ++i) {
-    val = analogRead(_sensePins[i]);
-    _senseBucket[i] += val;
-  }
-
-  
+  _vemlBucket += val;  
   _numSamplesRead++;
 
   if (_numSamplesRead >= kNumOversamples) {
     char outBuf[80];
-
-    DateTime now = _rtc.now();
-    uint32_t timestamp = now.unixtime();
     
-    //take the average of the samples in each bucket
-    for (i = 0 ; i < kNumSensors; ++i) {
-      _senseBucket[i] = _senseBucket[i] / _numSamplesRead;
-    }
     //average the veml values
     uint32_t vemlReport =  _vemlBucket / _numSamplesRead;
-    
-    // format the date output as YYYY-MM-DD HH:MM:SS 
-    // eg: 2014-08-19 12:41:35.220
-    sprintf(_dateTimeBuf,
-    "%4.2d-%2.2d-%2.2d %2.2d:%2.2d:%2.2d", 
-    now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
+    int timestamp = (millis() - _startTime)/kMillisToTimestamp;
 
-    sprintf(outBuf,"%s\t%d\t%d\t%d\t%d\t%d",_dateTimeBuf,
-    _senseBucket[0],_senseBucket[1],_senseBucket[2],_senseBucket[5],vemlReport);
+    sprintf(outBuf,"%d\t%d",timestamp,vemlReport);
     logMsg(outBuf);
 
     clearSampleBuffer();
-    
   }
     
   digitalWrite(kStatusLED, LOW);  //  done 
